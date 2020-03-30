@@ -1,0 +1,15 @@
+video_path: 'superman/cut_test.mp4'
+image_path: 'superman/frame2210.png'
+template_path: 'superman/1X_BET_2.png'
+kp_template: 'superman/ff.png'
+dst_threshold: 0.7
+min_match_count: 40
+n_features: 10000
+rc_threshold: 5.0
+matcher:
+  index_params:
+  - 1
+  - 5
+  search_params: 70
+kernel: 5
+area_threshold: 0.065
