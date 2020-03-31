@@ -10,7 +10,7 @@ class OpenCVLogoReplacer(LogoReplacer):
         self.logo = logo_path
         self.parameters = {}
         self.corners = 0
-        self.min_ratio = 100
+        self.frame_num = 0
 
     def __field_detection(self, kp_template, matcher, min_match_count, dst_threshold, n_features, rc_threshold):
         gray_frame = cv.cvtColor(self.frame, cv.COLOR_BGR2GRAY)
@@ -78,36 +78,79 @@ class OpenCVLogoReplacer(LogoReplacer):
         index_max_list = np.ravel(np.argmax(approx, axis=0))
         index_min_list = np.ravel(np.argmin(approx, axis=0))
 
-        top_left = approx[index_min_list[0]].tolist()[0]
-        bot_left = approx[index_max_list[1]].tolist()[0]
-        bot_right = approx[index_max_list[0]].tolist()[0]
-        top_right = approx[index_min_list[1]].tolist()[0]
+        top_left = approx[index_min_list[1]].tolist()[0]
+        bot_left = approx[index_min_list[0]].tolist()[0]
+        x_max = approx[np.where(approx == frame_copy.shape[1] - 1)[0].tolist()]
+        new_index_max = np.ravel(np.argmax(x_max, axis=0))[1]
+        new_index_min = np.ravel(np.argmin(x_max, axis=0))[1]
+        bot_right = x_max[new_index_max].tolist()[0]
+        top_right = x_max[new_index_min].tolist()[0]
 
-        if bot_right[0] == top_right[0]:
-            new_array = approx[np.where(approx == frame_copy.shape[1] - 1)[0].tolist()]
-            new_index_max = np.ravel(np.argmax(new_array, axis=0))
-            bot_right = new_array[new_index_max[1]].tolist()[0]
+        if self.frame_num < 1750:
 
-        left_height = np.sqrt((top_left[0]-bot_left[0])**2+(top_left[1]-bot_left[1])**2)
-        top_width = np.sqrt((top_left[0] - top_right[0])**2)
-        bot_width = np.sqrt((bot_left[0] - bot_right[0])**2)
-        ratio_top = left_height/top_width
-        ratio_bot = left_height/bot_width
+            left_height = abs(top_left[1] - bot_left[1])
+            right_height = abs(top_right[1] - bot_right[1])
+            top_width = abs(top_left[0] - top_right[0])
+            bot_width = abs(bot_left[0] - bot_right[0])
 
-        if abs(ratio_top - 1.26) > 0.1 or abs(ratio_bot - 1.26) > 0.1:
-            tmp_top_r_x = top_left[0] + left_height / 1.27
-            tmp_bot_r_x = bot_left[0] + left_height / 1.22
-            y_top = lambda x: (x - top_left[0]) * (top_right[1] - top_left[1]) / (top_right[0] - top_left[0]) + \
-                              top_left[1]
+            ratio_top = left_height / top_width
+            ratio_bot = left_height / bot_width
 
-            y_bot = lambda x: (x - bot_left[0]) * (bot_right[1] - bot_left[1]) / (bot_right[0] - bot_left[0]) + \
-                              bot_left[1]
+            if bot_right[0] >= 1276 or top_right[0] >= 1276:
+                y_top = lambda x: (x - top_left[0]) * (top_right[1] - top_left[1]) / (top_right[0] - top_left[0]) + \
+                                  top_left[1]
+                y_bot = lambda x: (x - bot_left[0]) * (bot_right[1] - bot_left[1]) / (bot_right[0] - bot_left[0]) + \
+                                  bot_left[1]
 
-            top_right[1] = y_top(tmp_top_r_x)
-            bot_right[1] = y_bot(tmp_bot_r_x)
-            top_right[0] = tmp_top_r_x
-            bot_right[0] = tmp_bot_r_x
-        print(bot_right)
+                if right_height > left_height:
+                    bot_left[1] = top_left[1] + right_height
+                else:
+                    bot_right[1] = top_right[1] + left_height
+
+                if top_width > bot_width:
+                    tmp_bot_r_x = top_left[0] + top_width
+                    bot_right[1] = y_bot(tmp_bot_r_x)
+                    bot_right[0] = tmp_bot_r_x
+                else:
+                    tmp_top_r_x = top_left[0] + bot_width
+                    top_right[1] = y_top(tmp_top_r_x)
+                    top_right[0] = tmp_top_r_x
+
+                ratio_top = left_height / top_width
+                ratio_bot = left_height / bot_width
+
+                # if abs(ratio_top - 1.27) > 0.05 or abs(ratio_bot - 1.22) > 0.05:
+                bot_left[1] = top_left[1] + top_width * (ratio_top + 0.25)
+                left_height = abs(top_left[1] - bot_left[1])
+                tmp_top_r_x = top_left[0] + left_height / ratio_top
+                tmp_bot_r_x = bot_left[0] + left_height / ratio_bot
+
+                top_right[1] = y_top(tmp_top_r_x)
+                bot_right[1] = y_bot(tmp_bot_r_x)
+                top_right[0] = tmp_top_r_x
+                bot_right[0] = tmp_bot_r_x
+
+        if self.frame_num > 1749:
+
+            left_height = np.sqrt((top_left[0] - bot_left[0]) ** 2 + (top_left[1] - bot_left[1]) ** 2)
+            top_width = abs(top_left[0] - top_right[0])
+            bot_width = abs(bot_left[0] - bot_right[0])
+            ratio_top = left_height / top_width
+            ratio_bot = left_height / bot_width
+
+            if abs(ratio_top - 1.26) > 0.1 or abs(ratio_bot - 1.26) > 0.1:
+                tmp_top_r_x = top_left[0] + left_height / 1.27
+                tmp_bot_r_x = bot_left[0] + left_height / 1.22
+                y_top = lambda x: (x - top_left[0]) * (top_right[1] - top_left[1]) / (top_right[0] - top_left[0]) + \
+                                  top_left[1]
+
+                y_bot = lambda x: (x - bot_left[0]) * (bot_right[1] - bot_left[1]) / (bot_right[0] - bot_left[0]) + \
+                                  bot_left[1]
+
+                top_right[1] = y_top(tmp_top_r_x)
+                bot_right[1] = y_bot(tmp_bot_r_x)
+                top_right[0] = tmp_top_r_x
+                bot_right[0] = tmp_bot_r_x
 
         self.corners = [top_left, bot_left, bot_right, top_right]
         pts = np.array(self.corners, np.int32)
@@ -149,25 +192,31 @@ class OpenCVLogoReplacer(LogoReplacer):
 
 if __name__ == '__main__':
     logo = 'superman/1X_BET_2.png'
-    video = 'superman/cut_test.mp4'
+    video = 'superman/final_superman_1.avi'
     # image = '/Users/oleksandr/Folder/superman/frame2210.png'
     write_video = True
-    df = pd.DataFrame(columns=['x_top_left', 'y_top_left', 'x_top_right',
-                               'y_top_right', 'x_bot_left', 'y_bot_left',
-                               'x_bot_right', 'y_bot_right'])
+    # df = pd.DataFrame(columns=['x_top_left', 'y_top_left', 'x_top_right',
+    #                            'y_top_right', 'x_bot_left', 'y_bot_left',
+    #                            'x_bot_right', 'y_bot_right'])
     if write_video:
+        i = 0
         capture = cv.VideoCapture(video)
         frame_width = int(capture.get(3))
         frame_height = int(capture.get(4))
-        four_cc = cv.VideoWriter_fourcc(*'MJPG')
-        out = cv.VideoWriter('result.avi', four_cc, 30, (frame_width, frame_height), True)
+        four_cc = cv.VideoWriter_fourcc('m', 'p', '4', 'v')
+        out = cv.VideoWriter('final_superman_1.mp4', four_cc, 30, (frame_width, frame_height), True)
         min_ratio = 100
+        count_frames = capture.get(cv.CAP_PROP_FRAME_COUNT)
+        print(count_frames)
         while capture.isOpened():
+
             ret, frame = capture.read()
+            print(i)
             if ret:
                 logo_replacer = OpenCVLogoReplacer(frame, logo)
                 logo_replacer.build_model('parameters_setting.yml')
                 logo_replacer.min_ratio = min_ratio
+                logo_replacer.frame_num = i
                 detected = logo_replacer.detect_object()
                 # top_left, bot_left, bot_right, top_right = logo_replacer.corners
                 # df = df.append({"x_top_left": top_left[0], "y_top_left": top_left[1],
@@ -175,15 +224,16 @@ if __name__ == '__main__':
                 #                 "x_bot_right": bot_right[0], "y_bot_right": bot_right[1],
                 #                 "x_top_right": top_right[0], "y_top_right": top_right[1]},
                 #                 ignore_index=True)
-                if logo_replacer.min_ratio < min_ratio:
-                    min_ratio = logo_replacer.min_ratio
+                # if logo_replacer.min_ratio < min_ratio:
+                #     min_ratio = logo_replacer.min_ratio
                 if detected is not None:
                     logo_replacer.insert_logo(detected)
                 cv.imshow('video', frame)
                 out.write(frame)
             else:
                 break
-            # df.to_csv("superman.csv")
+            i += 1
+            # df.to_csv("supermen.csv")
             key = cv.waitKey(1)
             if key == 27:
                 cv.destroyAllWindows()
