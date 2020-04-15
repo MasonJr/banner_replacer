@@ -78,15 +78,20 @@ class OpenCVLogoReplacer(LogoReplacer):
         index_max_list = np.ravel(np.argmax(approx, axis=0))
         index_min_list = np.ravel(np.argmin(approx, axis=0))
 
-        top_left = approx[index_min_list[1]].tolist()[0]
-        bot_left = approx[index_min_list[0]].tolist()[0]
-        x_max = approx[np.where(approx == frame_copy.shape[1] - 1)[0].tolist()]
-        new_index_max = np.ravel(np.argmax(x_max, axis=0))[1]
-        new_index_min = np.ravel(np.argmin(x_max, axis=0))[1]
-        bot_right = x_max[new_index_max].tolist()[0]
-        top_right = x_max[new_index_min].tolist()[0]
+        top_left = approx[index_min_list[0]].tolist()[0]
+        bot_left = approx[index_max_list[1]].tolist()[0]
+        bot_right = approx[index_max_list[0]].tolist()[0]
+        top_right = approx[index_min_list[1]].tolist()[0]
 
-        if self.frame_num < 1750:
+        if self.frame_num <= 1700:
+
+            top_left = approx[index_min_list[1]].tolist()[0]
+            bot_left = approx[index_min_list[0]].tolist()[0]
+            x_max = approx[np.where(approx == frame_copy.shape[1] - 1)[0].tolist()]
+            new_index_max = np.ravel(np.argmax(x_max, axis=0))[1]
+            new_index_min = np.ravel(np.argmin(x_max, axis=0))[1]
+            bot_right = x_max[new_index_max].tolist()[0]
+            top_right = x_max[new_index_min].tolist()[0]
 
             left_height = abs(top_left[1] - bot_left[1])
             right_height = abs(top_right[1] - bot_right[1])
@@ -130,7 +135,11 @@ class OpenCVLogoReplacer(LogoReplacer):
                 top_right[0] = tmp_top_r_x
                 bot_right[0] = tmp_bot_r_x
 
-        if self.frame_num > 1749:
+        if self.frame_num > 1700:
+            if bot_right[0] == top_right[0]:
+                new_array = approx[np.where(approx == frame_copy.shape[1] - 1)[0].tolist()]
+                new_index_max = np.ravel(np.argmax(new_array, axis=0))
+                bot_right = new_array[new_index_max[1]].tolist()[0]
 
             left_height = np.sqrt((top_left[0] - bot_left[0]) ** 2 + (top_left[1] - bot_left[1]) ** 2)
             top_width = abs(top_left[0] - top_right[0])
